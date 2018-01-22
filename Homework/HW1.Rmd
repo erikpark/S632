@@ -1,0 +1,205 @@
+---
+title: "S632 HW1"
+author: "Erik Parker"
+date: "January 18th, 2018"
+output: pdf_document
+---
+
+```{r setup, include=FALSE, message=FALSE, warning=FALSE, tidy=TRUE}
+knitr::opts_chunk$set(echo = TRUE, message = FALSE, warning = FALSE, tidy = TRUE)
+```
+
+### 1. ALR 10.2: Use the data file *Highway*
+
+```{r}
+
+rm(list=ls())
+
+library(alr4)
+library(leaps)
+
+highway <- Highway
+
+```
+
+#### 10.2.1: For the highway data, verify the forward selection and backward elimination subsets that are given in section 10.2.2
+
+```{r}
+
+fs <- lm(log(rate) ~ log(len), data = highway)
+bs <- lm(log(rate) ~ ., data = highway)
+
+highway$sigs1  =  with(highway, (sigs * len + 1)/len)
+f  =  ~ log(len) + shld + log(adt) + log(trks) + lane + slim + lwid +
+  itg + log(sigs1) + acpt + htype
+
+m.fwd  =  step(fs, scope=f, direction="forward")
+
+m1  =  update(fs, f)
+
+m.bck  =  step(m1, scope = list(lower = ~ log(len), upper = m1), direction="backward")
+
+```
+
+> This procedure successfully verified the data presented in section 10.2.2 of ALR4.
+
+#### 10.2.2: Use as response *log(rate X len)* and treat *lwid* as the focal regressor. Use both forward selection and backward elimination to assess the importance of *lwid*.
+
+```{r}
+
+m.lwid <- lm(log(rate*len) ~ lwid, data = highway)
+
+f2  =  ~ shld + log(adt) + log(trks) + lane + slim +
+  itg + log(sigs1) + acpt + htype + lwid
+
+m.upper <- update(m.lwid, f2)
+
+m.sw.up  =  step(m.lwid, scope=f2)
+
+m.sw.down  =  step(m.upper, scope = list(lower = ~ lwid, upper = m.upper), direction = "both")
+
+
+```
+
+> While treating *log(rateXlen)* as the response and *lwid* as the focal regressor, we see that both forward selection and backward elimination arrive at the same result: a final model comprising the regressors *lwid* and *shld*. From looking at the AIC values which result from the stepwise process, it seems like *lwid* is an important regressor as both the FS and BE methods agree that the only improvement to a model already containing *lwid* is an inclusion of *shld*. This seems to suggest that *lwid* by itself is quite important. 
+
+#### 10.2.3: Repeat problem 10.2.2 but use *log(rate)* as the response and *-log(len)* as an offset. Is the analusis the same or different?
+
+```{r}
+
+m.lwid <- lm(log(rate) ~ lwid, data = highway, offset = -log(len))
+
+f2  =  ~ shld + log(adt) + log(trks) + lane + slim +
+  itg + log(sigs1) + acpt + htype + lwid
+
+m.upper <- update(m.lwid, f2)
+
+m.sw.up  =  step(m.lwid, scope=f2)
+
+m.sw.down  =  step(m.upper, scope = list(lower = ~ lwid, upper = m.upper), direction = "both")
+
+```
+
+> When repeating problem 10.2.2 while using *-log(len)* as an offset, we see that the end result of both the FS and BE methods is the same: a final model with the regressors *lwid* and *shld*. This seems to be because AIC ignores constants which are the same for every candidate subset, and the offset sets a known coefficient equal to -1 for *log(len)*.
+
+
+### 2. ALR 10.4: For the boys in the Berkeley Guidance Study find a model for *HT18* as a function of the other variables for ages 9 and earlier. Perform a complete analysis including selection of transformations and diagnostic analysis, and summarize your results.
+
+```{r}
+
+boys <- BGSboys
+
+bc1 = powerTransform(cbind(WT2, HT2, WT9, HT9, LG9, ST9) ~ 1, boys)
+summary(bc1)
+# So log transformation for WT2, and inverse for WT9 and LG9.
+
+m0 <- lm(HT18 ~ 1, data = boys)
+
+full <- ~ log(WT2) + HT2 + I(1/WT9) + HT9 + I(1/LG9) + ST9
+
+m.fwd <- step(m0, scope = full, direction = "forward")
+# From FW, HT9 and inverse LG9 are most necessary, AIC of 150.83
+
+m1 <- update(m0, full)
+
+m.bck  =  step(m1, scope = list(lower = m0, upper = m1), direction="backward")
+# This BE method also adds log of WT2 and HT2 for an AIC of 151.25.
+
+bc2 = powerTransform(HT18 ~ log(WT2) + HT2 + HT9 + I(1/LG9), boys)
+summary(bc2)
+# Don't need to transform HT18 with these regressors
+
+m.boysfull <- lm(HT18 ~ log(WT2)*HT2*HT9*I(1/LG9), boys)
+
+Anova(m.boysfull)
+# From this, seems like only HT9, inverse of LG9, and their interaction are needed.
+
+m.boys <- lm(HT18 ~ HT9*I(1/LG9), boys)
+m.boys.main <- lm(HT18 ~ HT9+I(1/LG9), boys)
+
+anova(m.boys.main, m.boys)
+# So, interaction seems necessary. Can't reject the null that the interaction adds to our understanding of the response.
+
+rp1 <- residualPlots(m.boys)
+rp1
+
+ncvTest(m.boys)
+
+# So, no polynomial term seems to be necessary, and can't reject the null hypothesis that the variance is constant.
+
+influenceIndexPlot(m.boys, id.n = 3)
+
+outlierTest(m.boys)
+# So. no real outliers, but datapoint 60 is very comparitively influential.
+```
+
+> Based on the above analyses, it seems that the best model for explaining the variance seen in *HT18* is $lm(HT18 \sim HT9*I(1/LG9)$. Diagnostic tests revealed that no polynomial term was necessary for this model, the variance can be treated as constant, and finally that there were no outliers in this data - save for entry 60 which was found to be highly influential with a relatively high cook's distance of around 1.5.
+
+
+### 3. Use the baseball pitchers data to answer the following questions.
+
+#### a. Employing one or more of the methods of model selection described in the course, develop a model to predict pitchers' salaries. Be sure to explore the data and think about variables to use as predictors before specifying candidate models. How good is the model, and does it make sense?
+
+```{r}
+
+baseball <- read.table("BaseballPitchers.txt", header = TRUE)
+
+scatterplotMatrix(~ salary + years + careerL + careerW + careerERA + careerG + careerIP + careerSV, smoother = FALSE, data = baseball)
+# The above variables seem to have the strongest relationship with salary
+
+baseball$careerSV2 <- baseball$careerSV + 0.001
+
+bc1 = powerTransform(cbind(years, careerL, careerW, careerERA, careerG, careerIP, careerSV2) ~ 1, baseball)
+summary(bc1)
+
+bc2 = powerTransform(salary ~ sqrt(years) + I(careerL^(1/3)) + I(careerW^(1/3)) + careerERA + I(careerG^(1/3)) + I(careerIP^(1/3)) + I(careerSV2^(1/3)), baseball)
+summary(bc2)
+# So, with these regressors, salary needs a cube root transformation, but it is really close to a log transformation, and that is easier to interpret, so I will use that.
+
+m.base.full <- lm(log(salary) ~ sqrt(years) + I(careerL^(1/3)) + I(careerW^(1/3)) + careerERA + I(careerG^(1/3)) + I(careerIP^(1/3)) + I(careerSV2^(1/3)), baseball)
+
+m.bck  =  step(m.base.full, scope = list(lower = ~ 1, upper = m.base.full), direction="backward")
+# So, this suggests that the model should be based on careerERA, careerG^1/3 and careerIP^1/3.
+
+scatterplotMatrix(~ log(salary) + careerERA + I(careerG^(1/3)) + I(careerIP^(1/3)), smoother = FALSE, data = baseball)
+# Looks good enough! The curving of the data for careerG and IP is a little concerning, but it seems straight enough for my current purposes.
+
+
+m.pitch.final <- lm(log(salary) ~ careerERA + I(careerG^(1/3)) + I(careerIP^(1/3)), baseball)
+
+summary(m.pitch.final)
+```
+
+> This chosen model, with *careerERA*, and the cube roots of *careerG* and *careerIP* as the regressors explains roughly 58% of the variance seen in the (log treansformed) salary variable. This seems to be pretty good for this rather messy data - and it also makes a good amount of sense. Pitchers who do a better job striking out batters (lower ERA), and who have been playing in the league longer and so have more experience, end up with higher salaries. So, more experienced better (by one important, individual, metric) pitchers make more money.
+
+#### b. Repeat part a but divide the data randomly into two subsamples, applying one or more methods of model selection to the first subsample. Then evaluate the selected models on the second subsample.
+
+```{r}
+
+set.seed(103) # Set Seed so that same sample can be reproduced in future also
+# Now Selecting 50% of data as sample from total 'n' rows of the data  
+sample <- sample.int(n = nrow(baseball), size = floor(.5*nrow(baseball)), replace = F)
+train <- baseball[sample, ]
+test  <- baseball[-sample, ]
+
+
+# Repeating transformation stuff with the training set.
+
+bc1 = powerTransform(cbind(years, careerL, careerW, careerERA, careerG, careerIP, careerSV2) ~ 1, train)
+summary(bc1)
+
+bc2 = powerTransform(salary ~ sqrt(years) + I(careerL^(1/3)) + I(careerW^(1/3)) + careerERA + I(careerG^(1/3)) + I(careerIP^(1/3)) + I(careerSV2^(1/3)), train)
+summary(bc2)
+# So, rounded powers all seem to be the same.
+
+m.train.full <- lm(log(salary) ~ sqrt(years) + I(careerL^(1/3)) + I(careerW^(1/3)) + careerERA + I(careerG^(1/3)) + I(careerIP^(1/3)) + I(careerSV2^(1/3)), train)
+
+m.bck  =  step(m.train.full, scope = list(lower = ~ 1, upper = m.train.full), direction="backward")
+# interestingly, this training set points to a model without careerG like in part a, here just with careerERA and careerIP. Though the overall AIC is much higher than in part a, so maybe this model won't be as good?
+
+m.test <- lm(log(salary) ~ careerERA + I(careerIP^(1/3)), test)
+
+summary(m.test)
+```
+
+> Interstingly, even though the AIC arrived at using the backward elimination method on the training set was less negative than in part a when the full dataset was used, when the final model identified by the training set was evaluated on the validation subsample - the amount of variation explained by the model was slightly higher than in part a - 59% vs 58%. This is also despite the model chosen in part b having one less regressor. So at the very worst, the method of subsetting the data to choose a model used here is equivalent to using backward elimination on the entire dataset - at least in this particular case.
