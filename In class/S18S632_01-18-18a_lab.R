@@ -177,3 +177,4 @@ m.bck  =  step(m1, scope = list(lower = ~ log(len), upper = m1), direction="back
 m.sw.up  =  step(m0, scope=f)
 list(lower=m0, upper=m1)
 m.sw.down  =  step(m1, scope = list(lower = ~ log(len), upper = m1), direction = "both")
+m.sw.down  =  step(m0, scope = list(lower = ~ log(len), upper = m1), direction = "both")
