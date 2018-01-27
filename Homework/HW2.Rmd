@@ -1,0 +1,134 @@
+---
+title: "S632 HW2"
+author: "Erik Parker"
+date: "January 27th, 2018"
+output: pdf_document
+---
+
+```{r setup, include=FALSE, message=FALSE, warning=FALSE, tidy=TRUE}
+knitr::opts_chunk$set(echo = TRUE, message = FALSE, warning = FALSE, tidy = TRUE)
+```
+
+### 1. ELM 2.1: The dataset *wbca* comes from a study of breast cancer in Wisconsin. There are 681 cases of potentially cancerous tumors of which 238 are actually malignant. The purpose of the study was the determin whether a new procedure could be effective in determining tumor status.
+
+```{r}
+
+rm(list=ls())
+
+library(ggplot2)
+library(faraway)
+library(dplyr)
+library(pscl)
+
+cancer <- wbca
+
+```
+
+#### a) Plot the relationship between the classification and *BNucl*
+##### i. Explain why $plot(Class\sim BNucl,wbca)$ does not work well
+
+> The above plotting style does not work well because *Class* is a binomial response variable, and so has only two possibilities - 0 and 1. When plotted against *BNucl*, or really any other regressor, the result is just a series of overlapping points at the two y-axis values, arranged along the range of x-axis values. This isn't useful because it is impossible to tell what the frequency of each of the represented x-axis values is - they all just show up as single points.
+
+##### ii. Create a factor version of *Class* and replicate the first panel of Fig. 2.1. Comment on the shape of the boxplots.
+
+```{r}
+
+cancer$classf <- ifelse(cancer$Class == "0", "malignant", "benign")
+
+ggplot(cancer, aes(x = classf, y = BNucl)) + geom_boxplot()
+
+```
+
+> From these boxplots, it is clear that the vast majority of malignant tumors have very high bare nuclei scores (BNucl), though there is a little variation on the lower end of these scores. On the other hand, virtually all benign tumors have BNucl scores of 0, with very few cases above that. So for these data, a BNucl score above 0 is largely indicative of a malignant tumor.
+
+##### iii. Produce a version of the second panel of Fig. 2.1. What does this plot say about the distribution?
+
+```{r}
+
+ggplot(cancer,aes(BNucl, classf)) + geom_point(position = position_jitter(width = .3,height = .1)) 
+
+```
+
+> This plot, like the previous boxplot, shows us that the *BNucl* distributions of malignant and benign tumors are concentrated at the extreme high and low ends respectively. But, malignant tumors show more variation along the range of *BNucl* values in their distribution than do benign tumors.
+
+##### iv. Produce the histogram from Fig. 2.2.
+
+```{r}
+
+ggplot(cancer, aes(x = BNucl, fill = classf)) + geom_histogram(position = position_dodge())
+
+```
+
+> Like all of the previous plots, this one also shows that benign tumors largely have scores of 0 for *BNucl*, though they do show some other values which are mostly concentrated on the low end. Malignant tumors also largely have *BNucl* scores pinned to the top end of the distribution (10), and then show more variation in their distribution, with scores across the high, middle, and low end of *BNucl* values.
+
+
+#### b) Produce a version of Fig. 2.3 for the predictors *BNucl* and *Thick*. Produce an alternative version with only one panel but where the two types are plotted differently. Compare the two plots.
+
+```{r}
+
+ggplot(cancer, aes(x = BNucl, y = Thick, color = classf)) + geom_point(alpha = 0.2, position = position_jitter())
+
+```
+
+> This cool plot shows us that there is a large amount of segregation between benign and malignant tumors when the predictors *BNucl* and *Thick* are considered together. Benign tumors generally have lower scores for both predictors - so their points clump in the bottom left, while malignant tumors show higher scores for both generally - and so clump in the top right. Though again, we see much more variation in the values of not just *BNucl*, but also *Thick* for malignant tumors, so their points are more widely distributed around the space of the figure.
+
+
+#### c) Fit a binary regression with *Class* as the response and the other nine variables as predictors. Report the residual deviance and associated degrees of freedom. Can those measures be used to determine if this model fits the data?
+
+```{r}
+
+m.cancer <- glm(Class ~ Adhes + BNucl + Chrom + Epith + Mitos + NNucl + Thick + UShap + USize, family = binomial, cancer)
+
+summary(m.cancer)
+
+1-pchisq(791.9,671)
+
+```
+
+> The residual deviance and associated degrees of freedom for this model are 89.464 and 671. This information can be used to determine how well the model fits the data, at least when compared to a null model with no regressors. The result of this test, as shown above, is a very low p-value, letting us know that we can be confident that there is some relationship between the predictors and response.
+
+
+#### d) Use AIC to determine the best subset of variables
+
+
+```{r}
+
+step(m.cancer, scope = list(lower = ~1, upper = m.cancer), direction = "both")
+
+m.0 <- glm(Class ~ 1, family = binomial, cancer)
+
+step(m.0, scope = list(lower = m.0, upper = m.cancer), direction = "both")
+
+```
+
+> Using AIC, we see that the best subset of regressors tested is contained in the model *Class ~ BNucl + Thick + Chrom + Adhes + NNucl + Mitos + UShap*.
+
+
+#### e) Suppose that cancer is classified as benign if *p>0.5* and malignant if *p<0.5*. Compute the number of errors of both types that will be made if this method is applied to the current data with the reduced model.
+
+```{r}
+
+m.cancer.red <- glm(Class ~ BNucl + Thick + Chrom + Adhes + NNucl + Mitos + UShap, family = binomial, cancer)
+
+cancer.m <- na.omit(cancer)
+cancer.m <- mutate(cancer.m, predprob=predict(m.cancer.red, type = "response"))
+cancer.m <- mutate(cancer.m, predout = ifelse(predprob < 0.5, "malignant", "benign"))
+xtabs(~ classf + predout, cancer.m)
+
+```
+
+> So, using the reduced model and the current data: there will be a total of 20 misclassifications. 9 patients with benign tumors will be misdiagnosed with malignant ones, and 11 patients with malignant tumors will be misdiagnosed with benign ones.
+
+
+#### f) Suppose we change the cutoff to 0.9, so that *p<0.9* is malignant and *p>0.9* is benign. Compute the number of errors in this case.
+
+```{r}
+
+cancer.m <- mutate(cancer.m, predout = ifelse(predprob < 0.9, "malignant", "benign"))
+xtabs(~ classf + predout, cancer.m)
+
+
+```
+
+> In this case, only one patient will be misdagnosed as having a benign tumor when it is actually malignant. But now 16 will be labeled as having malignant tumors, when they are actually benign.
+
