@@ -81,11 +81,11 @@ m.cancer <- glm(Class ~ Adhes + BNucl + Chrom + Epith + Mitos + NNucl + Thick + 
 
 summary(m.cancer)
 
-1-pchisq(791.9,671)
+1-pchisq(791.9,9)
 
 ```
 
-> The residual deviance and associated degrees of freedom for this model are 89.464 and 671. This information can be used to determine how well the model fits the data, at least when compared to a null model with no regressors. The result of this test, as shown above, is a very low p-value, letting us know that we can be confident that there is some relationship between the predictors and response.
+> The residual deviance and associated degrees of freedom for this model are 89.464 and 671. This information can be used to determine how well the model fits the data, at least when compared to a null model with no regressors. To do this we can use the difference between the null and residual deviance, on a chi-squared distribution with p degrees of freedom. The result of this test, as shown above, is a very low p-value, letting us know that we can be confident that there is some relationship between the predictors and response.
 
 
 #### d) Use AIC to determine the best subset of variables
@@ -130,5 +130,67 @@ xtabs(~ classf + predout, cancer.m)
 
 ```
 
-> In this case, only one patient will be misdagnosed as having a benign tumor when it is actually malignant. But now 16 will be labeled as having malignant tumors, when they are actually benign.
+> In this case, only one patient will be misdagnosed as having a benign tumor when it is actually malignant. But now 16 will be labeled as having malignant tumors, when they are actually benign. Overall, the total number of errors is lower, and most importantly the number of missed diagnoses is much lower.
 
+
+#### g) Produce an ROC plot and comment on the effectiveness of the new diagnostic test.
+
+```{r}
+
+thresh <- seq(0.001,0.9999,0.001)
+sensitivity <- numeric(length(thresh))
+specificity <- numeric(length(thresh))
+for(j in seq(along = thresh)){
+  pp <- ifelse(cancer.m$predprob < thresh[j],"malignant","benign")
+  xx <- xtabs(~ classf + pp, cancer.m)
+  specificity[j] <- xx[1,1]/(xx[1,1]+xx[1,2])
+  sensitivity[j] <- xx[2,2]/(xx[2,1]+xx[2,2])
+}
+plot(1-specificity,sensitivity, type = "l", ylim = c(0,1), xlim = c(0,1))
+abline(0,1,lty=2)
+
+```
+
+> From the above ROC plot, we can see that the effectiveness of the new diagnostic test is very high - as the curve is pulled very far into the top left corner. This means that the test has a very high true positive rate (the sensitivity) and a low false positive rate (1 - specificity).
+
+
+#### h) Assign every third observation to a test set, and the remaining two thirds to a training set. Use the training set to determine the model and the test set to assess its performance.
+
+```{r}
+
+test <- cancer[seq(3,nrow(cancer),3),]
+train <- cancer[-c(seq(3,nrow(cancer),3)), ]
+
+m.train <- glm(Class ~ Adhes + BNucl + Chrom + Epith + Mitos + NNucl + Thick + UShap + USize, family = binomial, train)
+
+step(m.train, scope = list(lower = ~1, upper = m.train), direction = "both")
+
+m.0.train <- glm(Class ~ 1, family = binomial, train)
+
+step(m.0.train, scope = list(lower = m.0.train, upper = m.train), direction = "both")
+
+# Best model determined based on training set
+m.train.best <- glm(Class ~ Adhes + BNucl + Chrom + Mitos + NNucl + Thick + UShap, family = binomial, train)
+
+# Now evaluating model on test set
+test.m <- na.omit(test)
+test.m <- mutate(test.m, predprob=predict(m.train.best,newdata = test, type = "response"))
+test.m <- mutate(test.m, predout = ifelse(predprob < 0.5, "malignant", "benign"))
+xtabs(~ classf + predout, test.m)
+
+thresh <- seq(0.001,0.9999,0.001)
+sensitivity <- numeric(length(thresh))
+specificity <- numeric(length(thresh))
+for(j in seq(along = thresh)){
+  pp <- ifelse(test.m$predprob < thresh[j],"malignant","benign")
+  xx <- xtabs(~ classf + pp, test.m)
+  specificity[j] <- xx[1,1]/(xx[1,1]+xx[1,2])
+  sensitivity[j] <- xx[2,2]/(xx[2,1]+xx[2,2])
+}
+
+plot(1-specificity,sensitivity, type = "l", ylim = c(0,1), xlim = c(0,1))
+abline(0,1,lty=2)
+
+```
+
+> Here we see from the ROC plot, that while this model is also very good, it is a little worse than the previous one. This makes sense though as the previous model uses the same data it was constructed based on to test its predictive ability, while here we used two seperate datasets. So, when we construct a model in this more "correct" way, we see that it is still quite good for these data.
