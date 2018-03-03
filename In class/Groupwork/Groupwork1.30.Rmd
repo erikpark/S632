@@ -1,0 +1,93 @@
+---
+title: "S632 HW2"
+author: "Erik Parker"
+date: "January 27th, 2018"
+output: pdf_document
+---
+
+```{r setup, include=FALSE, message=FALSE, warning=FALSE, tidy=TRUE}
+knitr::opts_chunk$set(echo = TRUE, message = FALSE, warning = FALSE, tidy = TRUE)
+```
+
+### 1. ELM 2.2
+
+```{r}
+
+rm(list=ls())
+
+library(ggplot2)
+library(faraway)
+library(dplyr)
+library(pscl)
+
+Pima <- pima
+
+```
+
+### a
+
+```{r}
+
+Pima$testf <- ifelse(pima$test == "0", "negative", "positive")
+
+ggplot(pima, aes(x = insulin, fill = testf)) + geom_histogram(position = position_dodge())
+
+```
+
+### b) replace zero values for insulin with NA
+
+```{r}
+
+Pima$insulin[Pima$insulin == 0] <- NA
+
+ggplot(Pima, aes(x = insulin, fill = testf)) + geom_histogram(position = position_dodge())
+
+
+```
+
+### c) replace all incredible zeroes, and fit a model using results of the test as the response and all other variables as predictors
+
+```{r}
+
+Pima$glucose[Pima$glucose == 0] <- NA
+
+Pima$diastolic[Pima$diastolic == 0] <- NA
+
+Pima$triceps[Pima$triceps == 0] <- NA
+
+Pima$bmi[Pima$bmi == 0] <- NA
+
+Pima$test <- as.factor(Pima$test)
+
+diabetes.m <- glm(test ~ pregnant + glucose + diastolic + triceps + insulin + bmi + diabetes + age, family = binomial, na.omit(Pima))
+
+summary(diabetes.m)
+
+diabetes.m.r <- glm(test ~ pregnant + glucose + diastolic + bmi + diabetes + age, na.omit(Pima), family = binomial)
+
+summary(diabetes.m.r)
+
+anova(diabetes.m.r, diabetes.m, test="Chi")
+
+```
+
+
+### Use stepwise methods and AIC to choose a single regression model and interpret one coefficient
+
+
+```{r}
+
+m0 <- glm(test ~ 1, family = binomial, na.omit(Pima))
+
+m.sw = step(diabetes.m, scope=list(lower=m0, upper=diabetes.m), direction = "both")
+
+m.sw.fw = step(m0, scope=list(lower=m0, upper=diabetes.m), direction = "both")
+
+diabetes.final <- glm(test ~ pregnant + glucose + bmi + diabetes + age, na.omit(Pima), family = binomial)
+
+sumary(diabetes.final)
+exp(0.0365)
+
+```
+
+
