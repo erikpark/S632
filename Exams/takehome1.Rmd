@@ -1,7 +1,7 @@
 ---
-title: "S631 Takehome 1"
+title: "S632 Takehome - Exam 2"
 author: "Erik Parker"
-date: "October 9, 2017"
+date: "March 3, 2018"
 output: pdf_document
 ---
 
@@ -9,152 +9,201 @@ output: pdf_document
 knitr::opts_chunk$set(echo = TRUE, message = FALSE, warning = FALSE, tidy = TRUE)
 ```
 
-### 1. What is the probability that a randomly selected city has a crime rate higher than 3200 (per 100000 people)?  Is the crime rate normally distributed?
+### 1. Using only the methods and techniques learned so far in S632 (and, methods learned in 631 if you consider this appropriate), propose an appropriate model.
 
-> On my honor, I have not had any form of communication about this exam with any other individual (including other students, teaching assistants, instructors, etc.)
+
+> With the exception of the class instructor, I have not had any form of communication about this exam with any other individual (including other students, teaching assistants, instructors, etc.)
 
 > Signed: Erik Parker
+
+> We first saw from a summary of the data that there were many 0 counts of weeds, and that the distribution of observed humidity values is bimodal with a gap between 52 and 77%. This first suggested that the response might be zero inflated, and also that the treatment of humidity might be best as a categorical variable for high and low values or that a quadratic term for *Moist* might be necessary. First, to determine if a categorical variable for humidity would better predict the response, two models were compared. The reduced model had a *Moist* reduced to a two level variable with levels high and low, and the full model had the unaltered continuous *Moist* variable. A goodness of fit test comparing these two models found that we could safely reject the null hypothesis that the reduced model fit better than the full model.  
+> Next, to determine if the the weird shape of the *Moist* variable needed a quadratic term to accurately represent it, a model with a quadratic term was compared to one without. It was seen, using a goodness of fit test, that we couldn't reject the null hypothesis that the model without the quadratic term adaquately fit the data.
+> To then determine if the response was zero inflated, a variety of standard poisson models were compared to find the best among them in order to generate predicted values. Of these poisson models, it was determined using goodness of fit testing that the best one was a model regressing *Weeds* on *Moist*. Using this starting model, a predicted vs. observed plot was generated. This plot showed that there were many more observed zeroes (17) than expected (13). To account for this, the hurdle command was used to construct two models - one with only the regressor *Moist*, which earlier was shown to be the most influential individual regressor, and one with both *Moist* and *Days*. A likelihood ratio test comparing both models resulted in the conclusion that the reduced model, with only *Moist* was sufficient to explain the response. After this model was identified it was used to generate predicted values to draw another predicted vs. observed plot. The plot generated using this new model was seen to be much better - though the number of observed fields with one type of weed was still quite a bit higher than predicted. Despite this shortcoming, this model otherwise seems to be the best I am able to generate for these data. So the appropriate model here seems to be $hurdle(Weeds \sim Moist)$, as given in mz1.
+
+
+### 2. Interpret at least 2 of the coefficient estimates.
+
+> First, I will interpret zero_Moist, which corresponds to the coefficient estimate for the hurdle (binomial) part of the model. This estimate tells us that for every unit increase in *Moist*, or every percentage increase in humidity, we see that the odds of finding at least one type of weed change by a factor of $e^{\hat{\beta}}$ - so here our odds increase by a factor of 1.031, or 3.1%. 
+> The coefficient estimate for count_Moist corresponds to the poisson part of the model, and here we see that when we assume there is already one type of weed present, for every unit increase in *Moist* the expected number of type of weeds increases by (1.0319-1)*100% = 3.19%.
+
+
+### 3. Assume that your lawn is about 500ft^2 in size with 83% humidity level and you have not used any weed-control products for a whole year.
+#### a) How many types of weeds would you expect to find?
+
+> Based on having a lawn with 83% humidity and no weed control product usage for a year, we would expect to see 3.373 types of weeds, so ~3 types of weeds, in a 500 sq ft lawn. 
+
+
+#### b) What is the probability you are not going to observe any weeds?
+
+> The probability of observing no weeds is 20.1% under these conditions.
+
+
+#### c) What is the probability you may observe more than 3 types of weeds?
+
+> The probability of seeing more than three types of weeds under these conditions is 48.4%.
+
+
+### 4. Write the R code necessary to obtain the coefficient estimates for the model glm(Weeds ~ Days*Moist, family = "poisson") without using glm and show that your results are equivalent to those using glm. 
+
+> We can see in part 4 of the appendix that through calculating the estimated coefficients by "hand" using the Newton-Raphson method, we see values of $-1.410263^{e+00},~-3.877390e^{-03},~3.264673e^{-02},~~and~~  4.211656e^{-05}$ for the intercept, *Days*, *Moist* and the *Days:Moist* interaction respectively. The same exact coefficient estimates are seen from the summary of the poisson model constructed using the *glm()* command.
+
+\newpage
+
+## Appendix
+
+-----
+
+# 1.
 
 ```{r}
 
 rm(list=ls())
 library(alr4)
 library(ggplot2)
+library(faraway)
+library(pscl)
+library(GGally)
 
-cities <- read.table("takehome1.txt", header = TRUE)
+weed <- read.table("takehome.txt")
 
-str(cities)
-summary(cities)
+summary(weed)
+# So, ranges of days and moist are quite large and both include zero. Also, lots of 0 counts of weeds. Probably should consider using a zero inflated poisson model.
 
-prob32 <- sum(cities$crime > 3200)/length(cities$crime)
-prob32
+ggpairs(weed)
+# Moist looks almost bimodal, the lack of values from 52-77 is clear, but is it important?
 
-scatterplotMatrix(cities, smooth = FALSE)
-plot(density(cities$crime), main = "Density plot of crime rate")
+weed$moistcat <- ifelse(weed$Moist < "52", "low", "high")
+
+m1 <- glm(Weeds ~ ., data = weed, family = poisson)
+m2 <- glm(Weeds ~ Moist*Days, data = weed, family = poisson)
+m3 <- glm(Weeds ~ Moist, data = weed, family = poisson)
+#m4 <- glm.nb(Weeds ~ Moist*Days, data = weed)
+#m5 <- glm.nb(Weeds ~ Moist, data = weed)
+m6 <- glm(Weeds ~ moistcat, data = weed, family = poisson)
+m7 <- glm(Weeds ~ Moist + I(Moist^2), data = weed, family = poisson)
+
+
+pchisq(deviance(m1),df.residual(m1),lower=FALSE)
+pchisq(deviance(m2),df.residual(m2),lower=FALSE)
+pchisq(deviance(m3),df.residual(m3),lower=FALSE)
+pchisq(deviance(m6),df.residual(m6),lower=FALSE)
+pchisq(deviance(m7),df.residual(m7),lower=FALSE)
+
+pchisq(deviance(m3)-deviance(m1),df.residual(m3)-df.residual(m1),lower=FALSE)
+pchisq(deviance(m1)-deviance(m2),df.residual(m1)-df.residual(m2),lower=FALSE)
+pchisq(deviance(m3)-deviance(m2),df.residual(m3)-df.residual(m2),lower=FALSE)
+pchisq(deviance(m6)-deviance(m3),df.residual(m6)-df.residual(m3),lower=FALSE)
+pchisq(deviance(m3)-deviance(m7),df.residual(m3)-df.residual(m7),lower=FALSE)
+
+# So, none of these models appear to fit particularly well, really low p-values from the goodness of fit tests. But, of the three models, we see that the one with only Moist (m3) seems to be the best, according to these tests. Additionally, we see from the summary command that m3 has the lowest AIC of these models.
+# Also, from the fourth test above we can reject the null hypothesis that the reduced model, with our factor *moistcat*, fits better than the model with the full *Moist* regressor.
+# Also, the addition of the quadratic term for Moist^2 does not seem to significantly improve the model, as seen in the fifth test above versus the reduced model with just *Moist*.
+# So, of all the basic poisson models, we see that the model with *Moist* alone fits the best.
+# Will now try some tests to see why the deviance is still so high in m3.
+
+pcount <- colSums(predprob(m3)[,1:13])
+ocount <- table(weed$Weeds)[1:13]
+plot(pcount,ocount,type="n",xlab="Predicted",ylab="Observed")
+text(pcount,ocount, 0:12)
+abline(0,1)
+# The observed number of zeros (17) is much higher than the expected (~13), so it seems like going with a zero inflated poisson model would be a good choice here. But, the number of 1's seems to be higher than expected as well. Maybe the probability of observing 0 or 1 type of weeds is different than the other amounts and so 1 should be the hurdle?
+
+
+mz1 <- hurdle(formula = Weeds ~ Moist, data = weed)
+mz2 <- hurdle(formula = Weeds ~ Moist + Days, data = weed)
+#mz3 <- zeroinfl(formula = Weeds ~ Moist, data = weed)
+mz4 <- hurdle(formula = Weeds ~ Moist, data = weed, level = 1)
+
+lrt <- 2*(mz2$loglik - mz1$loglik)
+
+1-pchisq(lrt, 2)
+# So, can't reject null hypothesis that the reduced model, mz1, adaquately explains the response.
+
+pcount <- colSums(predprob(mz1)[,1:13])
+plot(pcount,ocount,type="n",xlab="Predicted",ylab="Observed")
+text(pcount,ocount, 0:12)
+abline(0,1)
+# So fitting the hurdle model makes this look much better, but the 1 count still has more observations than predicted.
+
+halfnorm(residuals(mz1))
+# No outliers
+
+plot(log(fitted(mz1)),log((weed$Weeds-fitted(mz1))^2), 
+     xlab=expression(hat(mu)),ylab=expression((y-hat(mu))^2))
+abline(0,1)
+# Mean seems pretty close to the variance here, not perfect, but it's okay.
+
+
 
 ```
 
-> Here we can see that the probability of randomly selecting a city from this dataset that ahs a crime rate higher than 3200 is 0.3, or 30%.  Furthermore, from the density plot we can also see that the crime rate is roughly normally distributed.
+-----
 
+\newpage
 
-### 2. Regress $crime$ on $population$.
+# 2. 
 
 ```{r}
 
-m1 <- lm(crime ~ log(population), data = cities)
+summary(mz1)
 
-# log transformation of population seems necessary as population is very right skewed in the scatterplot matrix above.
+exp(coef(mz1))
 
 ```
 
-#### a. Describe visually the relationship between the response and regressor. Are there any clear violations of the linear model assumptions?
+-----
+
+\newpage
+
+# 3. 
 
 ```{r}
 
-summary(m1)
+newlawn <- data.frame(Moist = 83, Days = 365)
 
-int1 <- coef(summary(m1))[1,1]
-beta1 <- coef(summary(m1))[2,1]
+predict(mz1, newdata = newlawn, type = "response")
 
-ggplot(cities, aes(x = log(population), y = crime)) + geom_point() + geom_abline(intercept = int1, slope = beta1, col = "red") + labs(title = "Regression of crime on log transformed population")
+predict(mz1, newdata = newlawn, type = "prob")
 
-ggplot(m1, aes(.fitted, .resid)) + geom_point() + geom_smooth() + labs(title = "Residual fit plot")
+# Also, can look at the probability coming from the "zero"" part of the model
+# 1 - predict(mz1, newdata = newlawn, type = "zero")
+# When the hurdle model is used, type = zero gives the probability of observing a non-zero count, based on the zero hurdle component - so this number is the probability of seeing a non-zero number of types of weeds. So 1- the predict command here is the probability of seeing a zero-number of types from the zero component of the hurdle model alone.
+
+weedtable <- predict(mz1, newdata = newlawn, type = "prob")
+
+sum(weedtable[5:14])
 
 ```
 
-> Based on these plots, I don't see any clear violations of the linear model assumptions.  From the first plot of log(population) vs crime rate, we can see that there is a pretty clear increasing, linear, relationship between the regressor and response.  There is no obvious curviture to the data, there are no obvious, egregious outliers present, and despite the higher concentration of points at lower population levels, there is still a pretty good spread of points along the X axis.  The second plot showing the residuals vs the fitted values for the regression also seems to have no real issues.  It closely resembles a null-plot as we see no real pattern to the data, there is no cone shape to the data indicating that the variance increases or decreases over different fitted values, and this data can be well summarized by a straight line at $Y = residual = 0$.
+-----
 
-#### b. Interpret the estimate $\hat{\beta}_1$, explain the underlying hypothesis test assumed in the R output, and interpret the results of the test.
+\newpage
+
+# 4. 
 
 ```{r}
 
-summary(m1)
+X = model.matrix(Weeds ~ Days*Moist, weed)
+y = as.numeric(weed$Weeds)
 
-exp(1)*1000
+beta_t = rep(0,4)
+mu = exp(X%*%beta_t) 
+beta_t1 = beta_t + solve(t(X)%*%diag(c(mu))%*%X)%*%t(X)%*%(y-mu)
 
-```
+i.count = 1
+while (sum((beta_t1-beta_t)^2) > 1e-6){
+  beta_t = beta_t1
+  mu = exp(X%*%beta_t)
+  beta_t1 = beta_t + solve(t(X)%*%diag(c(mu))%*%X)%*%t(X)%*%(y-mu)
+  i.count = i.count+1
+  print(c(i.count,beta_t1))
+}
 
-> The estimate $\hat{\beta}_1$ of 648.9 obtained from this first model tells us that for every unit increase in log(population) (which translates to an increase in population by roughly 2718 people), we see an increase in the crime rate (per 100,000 people) of a city by 648.9.
+beta_t1
 
-> The hypothesis test from this output, for $\beta_1$ is a two-tailed test testing the null hypothesis that $\beta_1 = 0$ against the alternative that $\beta_1 \neq 0$.  From the summary of our model, we can see that this test returned a very low p-value of 2.55e-08, meaning that we can safely reject the null hypothesis that $\beta_1 = 0$ and support the alternative that $\beta_1$ is not equal to zero.
-
-
-### 3. Regress *crime* on all three predictors.  Use *log* transformation on the regressors if appropriate.
-
-```{r}
-
-m2 <- lm(crime ~ log(population) + log(density) + log(nonwhite), data = cities)
-
-# here I log transformed all the predictors as they were all strongly left-skewed, just like was seen with population in the previous question.
-
-summary(m2)
-
-```
-
-#### a. Interpret the estimate $\hat{\beta}_1$, explain the underlying hypothesis test assumed in the *R* output for $\beta_1$ and interpret the corresponding output results.
-
-> In this multiple regression model, $\hat{\beta}_1$ corresponds to the log transformed population regressor, just like in the previous single regression.  However, the interpretation of this estimate is now quite different.  In the single regression case we could say that the estimated coefficient was simply the influence that log(population) had on crime rate for every unit change, but now this value of $\hat{\beta}_1$ corresponds to the *additional* contribution of log(population) on crime rate once all the contributions of the other regressors (log(density) and log(nonwhite)) have already been accounted for.  So, the $\hat{\beta}_1$ value of 670.28 means that for every unit change in log(population) (so like before, an addition of roughly 2718 people), there is an increase in crime rate by 670.28 per 100,000, *only when* all other regressors are already present in the model and are held constant.
-
-> Additionally, the meaning and interpretation of the hypothesis test for $\beta_1$ has also changed.  Now the null hypothesis that is being tested is that $\beta_1 = 0~~~with~~~ \beta_0,\beta_2,\beta_3~~~arbitrary$.  This essentially means that we are testing the influence of the regressor corresponding to $\beta_1$ only, while not caring about the other regressors.  So this test is looking at the effect of adding log(population) last to a multiple regression mean function that already contains all of the other regressors.  The results of this hypothesis test on $\beta_1$ show us a p-value of near 0, so we can safely reject the null hypothesis that $\beta_1 = 0$ when added last to a model containing the other regressors, meaning that log(population) has a significant explanatory influence on crime rate even when added last to our model.
-
-#### b. Compare the effect that *population* has on *crime* between the single and multiple regression model and explain why the effect changes.
-
-```{r}
-
-summary(lm(crime ~ log(population) + log(density), data = cities))
-
-```
-
-> As discussed above, the effect that *population* (specifically the log of population) has on *crime* is positive and significant in both models.  The main difference between the two, is that the influence of *population* is actually greater in the multiple regression compared to the single one when we consider the value for $\hat{\beta}_1$.  This is a bit confusing, as when adding variables to a multiple regression we might most often expect to see a *decrease* in influence as different variables can often explain the same variation and so when they are added last to the model there is already another variable present which explains the same variation they do, so their effect is less than when they are in a single regression model alone.  Here though, we see that the additional influence of log(population) on crime rate when the contributions of the other regressors are accounted for than when we consider the influence of log(population) on crime rate by itself.  Why is this?  It could be a meaningless difference, as the significance from the hypothesis test given by the p-value for $\beta_1$ of log(population) is actually slightly lower in the multiple regression, and the standard error is higher, meaning that the difference between the coefficients between the two models could be just due to "noise" and not any real effect.  Alternatively, we can see that the regressor log(density) has a marginally non-significant and negative slope estimate when added to the multiple regression.  So it could be that the inclusion of this regressor leads to a compensatory increase in the slope of log(population) when added last to our model.  This idea is suppoted by the multiple regression shown above between just the log of population and density.  There we see that the slope of log(population) increases a great deal over its single regression and full multiple regression model values, suggesting that the slope is increasing in these instances to counteract the influence of log(density) which is even less significant when added last to a model just containg log(population).
-
-> So overall, it seems fairly likely that the effect of *population* on *crime* is increasing between the first and second model due most to the presence of *density*.
-
-#### Compare $R^2$ from parts 2 and 3.  What can you conclude?
-
-> The values of $R^2$ from parts 2 and 3 respectively are 0.2725 and 0.4123.  This tells us that in the single regression model, 27.25% of the variation found in the response (crime rate) was being explained, while 41.23% of this variation was explained by the regressors in the multiple regression model.  This means that the addition of the other two regressors helped explain 13.98% more variation in the response, and so their addition was useful, though we don't know yet the additional contribution of each of the new regressors.
+m.rep <- glm(Weeds ~ Days*Moist, family = "poisson", data = weed)
+summary(m.rep)$coef[,1]
 
 
-### 4. What would be the most adequate linear model used to explain changes in crime?  Use that model to answer the following questions.
 
-> Will choose the best model by looking at $R^2$ values of the different possible models, and comparing them to find the model that explains the most variation in the response.
-
-```{r}
-
-summary(lm(crime ~ log(nonwhite), data = cities))$r.squared
-summary(lm(crime ~ log(population), data = cities))$r.squared
-summary(lm(crime ~ log(density), data = cities))$r.squared
-summary(lm(crime ~ log(nonwhite) + log(population) + log(density), data = cities))$r.squared
-summary(lm(crime ~ log(nonwhite) + log(population), data = cities))$r.squared
-
-
-```
-
-#### a. Why is this your chosen model?
-
-> When comparing the $R^2$ values between the different models above we can see that none of the single regressions explain more than 30% of the variation seen in our response.  When we look at the two best multiple regression models we find that even though in the last question we saw that log(density) was only marginally significant when included in the full model, dropping that regressor leads to a slightly lower $R^2$ value, meaning that *density* is still useful in explaining some of the variation seen in the response (roughly 2%).  So, even though it is only marginally important, I will include it in my chosen model which will be the full multiple regression model of form: *lm(crime ~ log(nonwhite) + log(population) + log(density), data = cities)*.
-
-#### b. Obtain and interpret a 98% confidence interval for $\beta_1$
-
-```{r}
-
-mbest <- lm(crime ~ log(population) + log(density) + log(nonwhite), data = cities)
-
-confint(mbest, level = 0.98)
-
-```
-
-> So, from this we can say that we are 98% confident that the true value for $\beta_1$ falls within the interval of 367.35 and 973.21.
-
-#### c. With 99% confidence, what would the crime rate for a city with a population of 1.15 million people be?
-
-```{r}
-
-summary(cities)
-newdata <- data.frame(population = 1150, nonwhite = 7.2, density = 412)
-predict(mbest, newdata, interval = "predict", level = 0.99)
-
-# I want to use my chosen model, which contains all the regressors, so I need to assign arbitrary values for density and nonwhite.  I chose the population median values from the summary table for this purpose.
-
-```
-
-> So using my chosen multiple linear regression model, I can say with 99% confidence that the crime rate for a city with a population of 1.15 million (and nonwhite percentage of 7.2, as well as density of 412 people/$mi^2$) would be between 1016.68 and 5072.81 per 100,000 people.
+````
