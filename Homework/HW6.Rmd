@@ -1,0 +1,203 @@
+---
+title: "S632 HW6"
+author: "Erik Parker"
+date: "April 12th, 2018"
+output: pdf_document
+---
+
+```{r setup, include=FALSE, message=FALSE, warning=FALSE, tidy=TRUE}
+knitr::opts_chunk$set(echo = TRUE, message = FALSE, warning = FALSE, tidy = TRUE)
+```
+
+### 1. The *denim* dataset in the package *faraway* concerns the amount of waste in material cutting
+for a jeans manufacturer due to five suppliers.
+
+
+
+```{r}
+
+rm(list=ls())
+
+library(alr4)
+library(ggplot2)
+library(faraway)
+library(lme4)
+library(RLRsim)
+library(lattice)
+
+
+denim <- denim
+
+```
+
+#### a) Plot the data and comment your results.
+
+```{r}
+
+ggplot(denim, aes(x= supplier, y = waste)) + geom_boxplot()
+
+```
+
+> In terms of the median amount of percentage denim waste, we see that there aren't really any huge differences between the suppliers. There are some outlying points, mostly for suppliers 1 and 2, but in general none of the suppliers are particularly wasteful.
+
+#### b) Fit the linear fixed effects model. Is *supplier* significant?
+
+```{r}
+
+m1 <- lm(waste ~ supplier, data = denim)
+
+Anova(m1)
+
+```
+
+> *Supplier* is not significant when we fit a linear fixed effects model.
+
+#### c)  Show the model when supplier is considered a random effect. using the Laird-Ware model (i.e., show what are *X, beta, Z, gamma*, and *epsilon* with the corresponding dimensions).
+
+```{r}
+
+summary(denim)
+
+```
+
+> Answer on attached document
+
+#### d) Using the model with *supplier* as a random effect, is the variance of *supplier* significant? Use two test for this, *LRT* with parametric bootstrapping and any other appropriate test of your choice. In addition, obtain a confidence intervals for the supplier effect standard deviation.
+
+```{r}
+
+mnull <- lm(waste ~ 1, denim)
+
+m2 <- lmer(waste ~ 1 + (1|supplier), denim, REML = FALSE)
+
+summary(m2)
+
+lr.1 <- as.numeric(2*(logLik(m2)-logLik(mnull)))
+
+# Parametric bootstrapping method
+y <- simulate(mnull) #Simulate from the distribution under the null
+lrstat <- numeric(1000)
+set.seed(142)
+for(i in 1:1000){
+  y <- unlist(simulate(mnull))
+  bnull <- lm(y ~ 1)
+  balt <- lmer(y ~ 1 + (1|supplier), denim, REML=FALSE)
+  lrstat[i] <- as.numeric(2*(logLik(balt)-logLik(bnull)))
+}
+
+phat = mean(lrstat > lr.1)
+phat
+
+m3 <- lmer(waste ~ 1 + (1|supplier), denim)
+
+exactRLRT(m3) #use exactRLRT for models obtained with REML
+
+dotplot(ranef(m3, condVar=TRUE))
+
+```
+
+> When the parametric bootstrapping method is used, we see a p-value of ~0.313, leading us to the conclusion that we can't reject the null-hypothesis that variance between the different suppliers is zero. So, the variance of *supplier* is not significant according to this test.  
+> And, from the exact test for random effects, we also see a relatively large p-value of ~0.346, leading again to the conclusion that we can't reject our null-hypothesis.
+
+#### e) Estimate the effect of each supplier. If only one supplier will be used, choose the best.
+
+```{r}
+
+lmod <- aov(waste ~ supplier, denim)
+
+cc <- model.tables(lmod)
+cc[[1]]$supplier/ranef(m3)$supplier
+
+# Or just this?
+
+ranef(m3)$supplier
+
+```
+
+> Based on these estimated random effects, the best supplier is number 1 as they have the lowest amount of wastage.
+
+
+### 2. An experiment was conducted to select the supplier of raw materials for production of a component. The breaking strength of the component was the objective of interest. Four suppliers were considered. The four operators can only produce one component each per day. A latin square design is used and the data is presented in the *breaking* dataset in the package *faraway*.
+
+#### a) Run the follow syntax, obtain, and interpret the plot: $ggplot(breaking, aes(y=y,x=operator, color=day, shape=supplier)) +geom_point()$
+
+```{r}
+
+breaking <- breaking
+
+ggplot(breaking, aes(y=y,x=operator, color=day, shape=supplier)) + geom_point()
+
+```
+
+> This complicated plot shows the difference in breaking strengths of various components, seperated by the operator testing the materials, as well as the day on which the component was produced and the supplier of the raw material. Immediatedly, we can see that supplier A seems to provide the raw material which results in the lowest breaking point of the completed component. Additionally, supplier C seems to generally provide high quality raw materials, with all operators, aside from 4, finding that the components made with raw material C had the highest breaking point.
+
+#### b) Using the Laird-Ware notation for a mixed effects model with operators and days as random effects but the suppliers as fixed effects.
+
+> Answer on attached document
+
+#### c)  Fit a fixed effects model for the main effects. Determine which factors are significant.
+
+```{r}
+
+m1 <- lm(y ~ operator + day + supplier, breaking)
+
+Anova(m1)
+
+```
+
+> From a type II Anova test of the main effects in the *breaking* dataset, we see that *supplier* is the only factor which is significant.
+
+#### d) Fit a mixed effects model with *operators* and *days* as random effects but *supplier* as a fixed effect. Why is this a natural choice of fixed and random effects? Which supplier results in the highest breaking point?
+
+```{r}
+
+m2 <- lmer(y ~ supplier + (1|operator) + (1|day), breaking)
+
+sumary(m2)
+
+```
+
+> The assignment of *supplier* as the fixed effect, and *operator* and *day* as the random effects is a natural choice as the operator testing the breaking point of some raw material, as well as the day on which that material was tested are quite likely determined at random. The supplier of a sample of raw material is in no way random though, and so should not be treated as such. Furthermore, from the plot in part a, we see that the only real discernable pattern was in terms of the supplier - *day* and *operator* showed no non-random pattern.  
+> From the summary of this model, we see that supplier C makes raw materials with the highest breaking point - as we first noticed from the plot in part a.
+
+#### e) Test the *operator* and *day* effects
+
+```{r}
+
+m2 <- lmer(y ~ supplier + (1|operator) + (1|day), breaking)
+
+m3 <- lmer(y ~ supplier + (1|operator), breaking)
+
+m4 <- lmer(y ~ supplier + (1|day), breaking)
+
+
+exactRLRT(m3,m2,m4)
+# Testing day
+
+exactRLRT(m4,m2,m3)
+# Testing operator
+
+
+mnull <- lm(y ~ supplier, breaking)
+
+m2 <- lmer(y ~ supplier + (1|operator) + (1|day), breaking, REML = FALSE)
+
+lr.1 <- as.numeric(2*(logLik(m2)-logLik(mnull)))
+
+y <- simulate(mnull) #Simulate from the distribution under the null
+lrstat <- numeric(1000)
+set.seed(142)
+for(i in 1:1000){
+  y <- unlist(simulate(mnull))
+  bnull <- lm(y ~ 1)
+  balt <- lmer(y ~ supplier + (1|day) + (1|operator), breaking, REML = FALSE)
+  lrstat[i] <- as.numeric(2*(logLik(balt)-logLik(bnull)))
+}
+
+phat = mean(lrstat > lr.1)
+phat
+
+
+```
+
+> When we test the two random effects seperately using the exact test, and when we test them together using the parametric bootstrapping method, we see that we get large p-values, meaning that we can't reject the null hypothesis that the variance of both random effects *operator* and *day* is zero.
