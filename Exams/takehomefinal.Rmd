@@ -1,0 +1,376 @@
+---
+title: "S632 Takehome Final"
+author: "Erik Parker"
+date: "April 24, 2018"
+output: pdf_document
+---
+
+```{r setup, include=FALSE, message=FALSE, warning=FALSE, tidy=TRUE}
+knitr::opts_chunk$set(echo = TRUE, message = FALSE, warning = FALSE, tidy = TRUE)
+```
+
+### 1.  Examine scatterplots of students’ test scores by centered SES and centered IQ for each of 10 randomly sampled schools. Do the relationships in the scatterplots seem reasonable linear?
+
+
+> With the exception of the class instructor, I have not had any form of communication about this exam with any other individual (including other students, teaching assistants, instructors, etc.)
+
+> Signed: Erik Parker
+
+```{r}
+
+rm(list=ls())
+library(lme4)
+library(alr4)
+library(ggplot2)
+library(faraway)
+library(tidyr)
+library(GGally)
+
+school <- read.table("S18S632final.txt")
+
+school <- school[complete.cases(school[,1:7]),]
+
+school$cses <- school$ses-school$meanses
+school$ciq <- school$iq-school$meaniq
+
+set.seed(161234)
+
+school.plot.ids <- sample(unique(school$school), 10)
+
+school.plot <- school[school$school %in% school.plot.ids,]
+
+ggplot(school.plot, aes(x = ciq, y = cses)) + geom_point() + facet_wrap(~school, ncol = 3) + labs(title = "Centered SES vs IQ by School", x = "Centered IQ", y = "Centered SES")
+
+```
+
+> If we take into account the low sample size of some of the schools, the scatterplots of centered SES against centered IQ for the 10 schools randomly selected do appear to be quite reasonably linear. In general, it seems that there is a relationship where as centered IQ increases, so too does centered SES. The strength of this relationship seems to varry between the 10 schools displayed here, but its general presence is consistent in these data.
+
+
+### 2. Regress the students’ test scores on centered SES and centered IQ within schools for the full data set - that is, compute a separate regression for each school. Then plot each set of coefficients (starting with the intercepts) against the schools’ mean SES, mean IQ, and class size. Do the coefficients appear to vary systematically by the schools’ centered SES, centered IQ, and class size)?
+
+```{r}
+
+library(broom)
+library(gridExtra)
+
+by_school <- group_by(school, school)
+
+m1 <- do(by_school, tidy(lm(test ~ cses + ciq, data = .)))
+
+m1 <- m1[,-c(4:6)]
+
+m1 <- spread(m1, term, estimate)
+
+others <- sample_n(by_school,1)
+others <- others[,c(1,5:7)]
+
+m1.final <- merge(m1,others,by = "school")
+colnames(m1.final)[4] <- "intercept"
+
+int.1 <- ggplot(m1.final, aes(x = class.size, y = intercept)) + geom_point()
+int.2 <- ggplot(m1.final, aes(x = meanses, y = intercept)) + geom_point() + labs(y="")
+int.3 <- ggplot(m1.final, aes(x = meaniq, y = intercept)) + geom_point() + labs(y="")
+grid.arrange(int.1,int.2,int.3, ncol = 3)
+
+ses.1 <- ggplot(m1.final, aes(x = class.size, y = cses)) + geom_point()
+ses.2 <- ggplot(m1.final, aes(x = meanses, y = cses)) + geom_point() + labs(y="")
+ses.3 <- ggplot(m1.final, aes(x = meaniq, y = cses)) + geom_point() + labs(y="")
+grid.arrange(ses.1,ses.2,ses.3, ncol = 3)
+
+iq.1 <- ggplot(m1.final, aes(x = class.size, y = ciq)) + geom_point()
+iq.2 <- ggplot(m1.final, aes(x = meanses, y = ciq)) + geom_point() + labs(y="")
+iq.3 <- ggplot(m1.final, aes(x = meaniq, y = ciq)) + geom_point() + labs(y="")
+grid.arrange(iq.1,iq.2,iq.3, ncol = 3)
+
+```
+
+>
+
+
+### 3. Fit linear mixed-effects models to the data, proceeding as follows:
+
+#### a) Begin with a model of test scores by schools with no fixed effects and only a random intercept. What proportion of the total variation in test scores among students is between schools (i.e., what is the intraclass correlation)?
+
+```{r}
+
+m.randint <- lmer(test ~ (1|school), school)
+
+summary(m.randint)$var
+
+intraclass.correlation <- (4.2743^2/(4.2743^2+7.8909^2))
+intraclass.correlation
+
+```
+
+> When we fit a model with test scores as the response, no fixed effects, and only a random intercept for *school*, we see that the proportion of total variation in test scores among students just being due to the school they attend is 0.2269, or 22.69%.
+
+#### b) Obtain a model for regressing test scores by schools with any fixed effects at the student level you consider appropriate and random effects for students’ centered SES and centered IQ (recall that your only grouping variable is school). Test whether each of these random effects is needed, and eliminate from the model those that are not (if any are not). How, if at all, are test scores related to the predictors? Justify your choices/decisions.
+
+```{r}
+
+library(RLRsim)
+
+m.5 <- lmer(test ~ iq + ses + (cses - 1|school), school)
+
+m.6 <- lmer(test ~ iq + ses + (ciq - 1|school), school)
+
+m.7 <- lmer(test ~ iq + ses + (1|school), school)
+
+m.8 <- lmer(test ~ iq + ses + (1 + cses + ciq||school), school)
+
+m.9 <- lmer(test ~ iq + ses + (1 + cses||school), school)
+
+m.10 <- lmer(test ~ iq + ses + (1 + ciq||school), school)
+
+m.11 <- lmer(test ~ iq + ses + (cses - 1 + ciq - 1||school), school)
+
+
+# testing cses random effect
+
+exactRLRT(m.5,m.8,m.10)
+
+# testing ciq random effect
+
+exactRLRT(m.6,m.8,m.9)
+
+# testing school random effect alone
+
+exactRLRT(m.7,m.8,m.11)
+
+sumary(m.6)
+
+```
+
+> After testing the various random effects introduced into the model, we see that the random effects for students' centered IQ and an intercept, when grouped by school, are significant. Centered SES was found to be non-significant using the exact restricted likelihood ratio test. These tests were done on models containing fixed effects for individual student IQ scores, and socioeconomic status as those two regressors seem to be likely contributing to test scores - but this assumption will be validated later in part d. 
+> From the summary of the model, we see that for the fixed effects: as a student's iq and ses increase by one unit, their test scores increase by 2.30 and 0.17 points, respectively while holding the other regressor constant. The large difference between these two coefficient estimates is likely largely due to the difference in scale between the two variables (4-18.5 for *IQ* and 10-50 for *SES*), and so the real difference in effect between the two is not so large.
+
+#### c) Introduce school level predictors; i.e., mean school SES, mean school IQ, and class size in your model. Test whether the random effects that you retained in part b model are still required now that there are other predictors in the model. 
+
+```{r}
+
+m.c <- lmer(test ~ iq + ses + class.size + meanses + meaniq + (ciq - 1|school), school)
+
+m.c2 <- lmer(test ~ iq + ses + class.size + meanses + meaniq + (ciq + 1||school), school)
+
+m.c3 <- lmer(test ~ iq + ses + class.size + meanses + meaniq + (1|school), school)
+
+exactRLRT(m.c,m.c2,m.c3)
+
+exactRLRT(m.c3,m.c2,m.c)
+
+```
+
+> Both of the random effects retained in the model from part b are both still significant when tested using the exact restricted likelihood ratio test, even after the additional school level predictors are added.
+
+#### d)  Compute tests of the various main effects and interactions. Then simplify the model by removing any fixed-effects terms that are nonsignificant.
+
+```{r}
+
+library(pbkrtest)
+
+m.main <- lmer(test ~ iq + ses + class.size + meanses + meaniq + (ciq + 1||school), school, REML = FALSE)
+
+m.int <- lmer(test ~ iq * ses * class.size * meanses * meaniq + (ciq + 1||school), school, REML = FALSE)
+
+KRmodcomp(m.int,m.main)
+# Reject null hypothesis that reduced model explains data well enough, but not by much so likely need to simplify model a bit.
+
+m.int2 <- lmer(test ~ iq * ses + class.size + meanses * meaniq + (ciq + 1||school), school, REML = FALSE)
+
+KRmodcomp(m.int,m.int2)
+# Can't reject null hypothesis that reduced model is sufficient.
+
+m.int3 <- lmer(test ~ iq * ses + meanses * meaniq + (ciq + 1||school), school, REML = FALSE)
+
+KRmodcomp(m.int2,m.int3)
+# Can't reject null that reduced is sufficient, again.
+
+m.int4 <- lmer(test ~ iq * ses + (ciq + 1||school), school, REML = FALSE)
+
+KRmodcomp(m.int3,m.int4)
+# This null model is rejected, so can't remove interaction between meanses and meaniq yet.
+
+m.int5 <- lmer(test ~ meaniq * meanses + (ciq + 1||school), school, REML = FALSE)
+
+KRmodcomp(m.int3,m.int5)
+# This null model also rejected, can't remove student level iq and ses yet
+
+```
+
+
+
+
+
+
+
+\newpage
+
+## Appendix
+
+-----
+
+# 1.
+
+```{r}
+
+rm(list=ls())
+library(alr4)
+library(ggplot2)
+library(faraway)
+library(pscl)
+library(GGally)
+
+weed <- read.table("takehome.txt")
+
+summary(weed)
+# So, ranges of days and moist are quite large and both include zero. Also, lots of 0 counts of weeds. Probably should consider using a zero inflated poisson model.
+
+ggpairs(weed)
+# Moist looks almost bimodal, the lack of values from 52-77 is clear, but is it important?
+
+weed$moistcat <- ifelse(weed$Moist < "52", "low", "high")
+
+m1 <- glm(Weeds ~ ., data = weed, family = poisson)
+m2 <- glm(Weeds ~ Moist*Days, data = weed, family = poisson)
+m3 <- glm(Weeds ~ Moist, data = weed, family = poisson)
+#m4 <- glm.nb(Weeds ~ Moist*Days, data = weed)
+#m5 <- glm.nb(Weeds ~ Moist, data = weed)
+m6 <- glm(Weeds ~ moistcat, data = weed, family = poisson)
+m7 <- glm(Weeds ~ Moist + I(Moist^2), data = weed, family = poisson)
+
+
+pchisq(deviance(m1),df.residual(m1),lower=FALSE)
+pchisq(deviance(m2),df.residual(m2),lower=FALSE)
+pchisq(deviance(m3),df.residual(m3),lower=FALSE)
+pchisq(deviance(m6),df.residual(m6),lower=FALSE)
+pchisq(deviance(m7),df.residual(m7),lower=FALSE)
+
+pchisq(deviance(m3)-deviance(m1),df.residual(m3)-df.residual(m1),lower=FALSE)
+pchisq(deviance(m1)-deviance(m2),df.residual(m1)-df.residual(m2),lower=FALSE)
+pchisq(deviance(m3)-deviance(m2),df.residual(m3)-df.residual(m2),lower=FALSE)
+pchisq(deviance(m6)-deviance(m3),df.residual(m6)-df.residual(m3),lower=FALSE)
+pchisq(deviance(m3)-deviance(m7),df.residual(m3)-df.residual(m7),lower=FALSE)
+
+# So, none of these models appear to fit particularly well, really low p-values from the goodness of fit tests. But, of the three models, we see that the one with only Moist (m3) seems to be the best, according to these tests. Additionally, we see from the summary command that m3 has the lowest AIC of these models.
+# Also, from the fourth test above we can reject the null hypothesis that the reduced model, with our factor *moistcat*, fits better than the model with the full *Moist* regressor.
+# Also, the addition of the quadratic term for Moist^2 does not seem to significantly improve the model, as seen in the fifth test above versus the reduced model with just *Moist*.
+# So, of all the basic poisson models, we see that the model with *Moist* alone fits the best.
+# Will now try some tests to see why the deviance is still so high in m3.
+
+pcount <- colSums(predprob(m3)[,1:13])
+ocount <- table(weed$Weeds)[1:13]
+plot(pcount,ocount,type="n",xlab="Predicted",ylab="Observed")
+text(pcount,ocount, 0:12)
+abline(0,1)
+# The observed number of zeros (17) is much higher than the expected (~13), so it seems like going with a zero inflated poisson model would be a good choice here. But, the number of 1's seems to be higher than expected as well. Maybe the probability of observing 0 or 1 type of weeds is different than the other amounts and so 1 should be the hurdle?
+
+
+mz1 <- hurdle(formula = Weeds ~ Moist, data = weed)
+mz2 <- hurdle(formula = Weeds ~ Moist + Days, data = weed)
+#mz3 <- zeroinfl(formula = Weeds ~ Moist, data = weed)
+mz4 <- hurdle(formula = Weeds ~ Moist, data = weed, level = 1)
+
+lrt <- 2*(mz2$loglik - mz1$loglik)
+
+1-pchisq(lrt, 2)
+# So, can't reject null hypothesis that the reduced model, mz1, adaquately explains the response.
+
+pcount <- colSums(predprob(mz1)[,1:13])
+plot(pcount,ocount,type="n",xlab="Predicted",ylab="Observed")
+text(pcount,ocount, 0:12)
+abline(0,1)
+# So fitting the hurdle model makes this look much better, but the 1 count still has more observations than predicted.
+
+halfnorm(residuals(mz1))
+# No outliers
+
+plot(log(fitted(mz1)),log((weed$Weeds-fitted(mz1))^2), 
+     xlab=expression(hat(mu)),ylab=expression((y-hat(mu))^2))
+abline(0,1)
+# Mean seems pretty close to the variance here, not perfect, but it's okay.
+
+
+
+```
+
+-----
+
+\newpage
+
+# 2. 
+
+```{r}
+
+summary(mz1)
+
+exp(coef(mz1))
+
+```
+
+-----
+
+\newpage
+
+# 3. 
+
+```{r}
+
+newlawn <- data.frame(Moist = 83, Days = 365)
+
+predict(mz1, newdata = newlawn, type = "response")
+
+predict(mz1, newdata = newlawn, type = "prob")
+
+# Also, can look at the probability coming from the "zero"" part of the model
+# 1 - predict(mz1, newdata = newlawn, type = "zero")
+# When the hurdle model is used, type = zero gives the probability of observing a non-zero count, based on the zero hurdle component - so this number is the probability of seeing a non-zero number of types of weeds. So 1- the predict command here is the probability of seeing a zero-number of types from the zero component of the hurdle model alone.
+
+weedtable <- predict(mz1, newdata = newlawn, type = "prob")
+
+sum(weedtable[5:14])
+
+```
+
+-----
+
+\newpage
+
+# 4. 
+
+```{r}
+
+X = model.matrix(Weeds ~ Days*Moist, weed)
+y = as.numeric(weed$Weeds)
+
+beta_t = rep(0,4)
+mu = exp(X%*%beta_t) 
+beta_t1 = beta_t + solve(t(X)%*%diag(c(mu))%*%X)%*%t(X)%*%(y-mu)
+
+i.count = 1
+while (sum((beta_t1-beta_t)^2) > 1e-6){
+  beta_t = beta_t1
+  mu = exp(X%*%beta_t)
+  beta_t1 = beta_t + solve(t(X)%*%diag(c(mu))%*%X)%*%t(X)%*%(y-mu)
+  i.count = i.count+1
+  print(c(i.count,beta_t1))
+}
+
+beta_t1
+
+m.rep <- glm(Weeds ~ Days*Moist, family = "poisson", data = weed)
+summary(m.rep)$coef[,1]
+
+
+
+````
+
+
+-----
+
+\newpage
+
+## References
+
+-----
+
+1. Randomly select groups (and all cases per group) in R? (n.d.). Retrieved April 24, 2018, from https://stackoverflow.com/questions/13214769/randomly-select-groups-and-all-cases-per-group-in-r
