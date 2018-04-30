@@ -3,18 +3,61 @@ title: "S632 Takehome Final"
 author: "Erik Parker"
 date: "April 24, 2018"
 output: pdf_document
+geometry: left=1.8cm,right=1.8cm,top=1.8cm,bottom=1.8cm
 ---
 
 ```{r setup, include=FALSE, message=FALSE, warning=FALSE, tidy=TRUE}
 knitr::opts_chunk$set(echo = TRUE, message = FALSE, warning = FALSE, tidy = TRUE)
 ```
 
-### 1.  Examine scatterplots of students’ test scores by centered SES and centered IQ for each of 10 randomly sampled schools. Do the relationships in the scatterplots seem reasonable linear?
+##### 1.
+
+With the exception of the class instructor, I have not had any form of communication about this exam with any other individual (including other students, teaching assistants, instructors, etc.)  
+Signed: Erik Parker  
+If we take into account the low sample size of some of the schools which leads to some odd behavior such as in the scatterplot of *cses* vs *test* for school 182 where all students have the same *cses*, the scatterplots of centered SES and centered IQ against Test score for the 10 schools randomly selected do appear to be quite reasonably linear. In general, it seems that there is a relationship where as centered IQ and centered SES increase, so too does test score. The strength of this relationship seems to vary between the 10 schools displayed here, but its general presence is consistent in these data.
 
 
-> With the exception of the class instructor, I have not had any form of communication about this exam with any other individual (including other students, teaching assistants, instructors, etc.)
+##### 2.
 
-> Signed: Erik Parker
+First for the plots of the intercepts, when we plot them against *class.size* the result closely resembles a null plot meaning that as the size of a class changes, there is no systematic change in the test scores of students in said class. When these intercepts are plotted against *meanses* and *meaniq* though, we see that there is a strong systematic trend, where classrooms of students with higher average iq's and ses tend to have higher average test scores as indicated here by higher intercepts. However, this relationship is exactly what we should expect to see given how the regression was constructed Recall that student's test scores were regressed against centered ses and centered IQ, which were calculated as the difference between an individual student's IQ and ses and the school wide averages of those two measures. Also recall that the intercept of a standard linear regression represents the expected value of the response (here *test*) when all the regressors (here *ciq* and *cses* are zero). This means that the intercepts being plotted here were obtained when the centered scores were zero, or equivalently, when an individual student's ses/IQ scores were the same as the school mean IQ/ses scores. So then it is no surprise that there is a linear relationship between *meanses* and *meaniq* and the intercepts, as the intercepts being plotted are exactly based on the mean ses and IQ scores for each school.  
+Moving on to the six plots of the coefficients for *cses* and *ciq* against *class.size*, *meanses* and *meaniq*, we see that there is no clear systematic variation to any of them - all six of these slope coefficient plots more or less resemble null plots. Taken together with the previous three plots, this suggests that there is no systematic relationship between the class size, or the mean ses or IQ scores, and the average test scores of a school (intercept) or how those test scores might change with varying levels of centered ses and IQ scores of the students in said class (slope coefficients).
+
+
+##### 3.
+
+###### a)
+
+When we fit a model with test scores as the response, no fixed effects, and only a random intercept for *school*, we see that the proportion of total variation in test scores among students just being due to the school they attend is 0.2269, or 22.69%.
+
+###### b)
+
+After testing the various random effects introduced into the model, we see that the random effects for students' centered IQ and an intercept, when grouped by school, are significant. Centered SES was found to be non-significant using the exact restricted likelihood ratio test. The models tested were constructed so that there was a covariance between centered IQ and centered ses because a plot of *cses* vs *ciq* for 10 random schools seemed to demonstrate that there was the possibility of a positive relationship between the two metrics, so I did not feel comfortable assuming they were independent.  
+These tests were done on models containing fixed effects for individual student IQ scores, and ses as it intuitively seems very likely that those two regressors will contribute to the test scores of students - and the plots of centered IQ and SES from part 1 suggest that there is a relationship between these two variables (in some form) and test score. Raw IQ and SES were chosen over the centered scores because those did not strike me as wholly "student level" effects, as they are scaled by the school average. The assumption that these were valuable variables to choose will be further validated later in part d.  
+From the summary of the model, we see that for the fixed effects: as a student's IQ and ses increase by one unit, their test scores increase by 2.30 and 0.17 points, respectively while holding the other regressor constant. The large difference between these two coefficient estimates is likely largely due to the difference in scale between the two variables (4-18.5 for *IQ* and 10-50 for *SES*), and so the real difference in effect between the two is not so large. For the random effects: we see first from the summary that the estimated inter-school variation in test scores is quite high (a SD of 3.08 against the residual SD of only 6.09), but that the variation based on *ciq* when grouped by school is quite small (SD of 0.48). This conclusion is further supported by plots of the 95% confidence intervals for each of these random effects, for each school which show that many of the intercepts are quite far from zero, while none of the *ciq* points are. This tells us that while *ciq* might have been tested as a random effect significantly different from zero using the exact test, the size of its effect is small.  
+
+###### c)
+
+Both of the random effects retained in the model from part b are both still significant when tested using the exact restricted likelihood ratio test, even after the additional school level predictors are added. That is, the test used returns low p-values, allowing us to reject the null hypotheses that the variance of the random effects tested (both centered IQ and an intercept grouped by school) is equal to zero.
+
+###### d)
+
+After a long string of Kenward-Roger approximate F-tests, we see that we are first able to drop the main effect for class size, and then that we are able to drop a number of interactions. In the end though, some higher level interactions were still seen to be significant. The eventual model arrived at contains a three way interaction between *IQ*, *SES*, and *meanIQ* (and the associated main effects and two way interactions), as well as a two way interaction between *meanSES*, and *meanIQ* (and the main effect for *meanSES*). Importantly, centered IQ and ses were only tested as fixed effects in a model by themselves (and an interaction between them) because they are linear combinations of the raw and mean IQ/ses scores, so they can't be added to a model containing the others. Also, the centered scores alone provide a reduced amount of information compared to the raw and mean scores together, so I felt comfortable choosing to not use them. This model was also chosen after pursuing a separate, AIC based approach for model selection.
+
+###### e)
+
+This model is quite complicated, so interpretations of the results will take some time. We see from diagnostics of the model first that the residuals are normal from the QQ plot and second that the variance is relatively constant across the range of fitted values, from the residual-fit plot. From this second plot we do see that the variance decreases at higher fitted values - this makes sense though because people who do well on tests generally do well at the same "level", because there's only so high one can score on a test.  
+With these diagnostics completed, we see from the summary of the model and, more importantly, from the effect plots of the model - that in general test scores increase with the student level measures of IQ and ses, and also with school-wide mean ses and IQ measures, though the school-wide measures are a little more complicated and will be addressed specifically later. Almost all of the plots show that in this model, test scores increase with whatever x-variable they are tested against, and across any faceting variable that we consider.  
+From these plots, we can also identify a few interesting trends. 1) When we "facet" by IQ and plot any of the other effects it interacts with, we see that students with higher iq's score higher on their tests on average compared to students with lower iq's. That is to say, students with higher iq's have a distribution of test scores concentrated near the high end of the spectrum, with relatively little overlap with students at the lower end of the IQ spectrum. 2) Mean IQ and mean SES have an interesting interactive relationship. When we plot the effect of mean SES, faceted by mean IQ we see that when the mean IQ of a school is low, an increase in the mean SES of a school leads to a modest increase in test scores. However, when the mean IQ of a school is high or intermediate, an increase in mean SES leads to a decrease in test scores. Similarly, when we examine the effect of mean IQ on test scores, when faceted by mean SES we see that test scores increase most with increases of mean IQ at low levels of mean SES and that the magnitude of this relationship decreases as mean SES increases. Together, these plots seems to suggest that students who attend schools with either very high mean SES or IQ scores generally tend to score high on their end of year tests, and increases in the other mean metric don't lead to the same magnitude of test score increases seen in schools with lower average SES and IQ scores.
+For the random effects, we see that in this model both random effects are significant by an exact restricted likelihood ratio test. Furthermore, from the summary, we see that the standard deviation of the *ciq* random effect is 0.44, so while it is statistically significant in the model - it has a relatively low magnitude and so can be considered not overly important. The random intercept though has a standard deviation of 2.85 and so is quite important. 
+
+
+\newpage
+
+## Appendix
+
+-----
+
+# 1.
 
 ```{r}
 
@@ -24,6 +67,7 @@ library(alr4)
 library(ggplot2)
 library(faraway)
 library(tidyr)
+library(dplyr)
 library(GGally)
 
 school <- read.table("S18S632final.txt")
@@ -33,22 +77,26 @@ school <- school[complete.cases(school[,1:7]),]
 school$cses <- school$ses-school$meanses
 school$ciq <- school$iq-school$meaniq
 
-set.seed(161234)
+set.seed(0330)
 
 school.plot.ids <- sample(unique(school$school), 10)
 
 school.plot <- school[school$school %in% school.plot.ids,]
 
-ggplot(school.plot, aes(x = ciq, y = cses)) + geom_point() + facet_wrap(~school, ncol = 3) + labs(title = "Centered SES vs IQ by School", x = "Centered IQ", y = "Centered SES")
+ggplot(school.plot, aes(x = cses, y = test)) + geom_point() + facet_wrap(~school, ncol = 3) + labs(title = "Centered SES vs Test score by School", x = "Centered SES", y = "Test score")
+
+ggplot(school.plot, aes(x = ciq, y = test)) + geom_point() + facet_wrap(~school, ncol = 3) + labs(title = "Centered IQ vs Test score by School", x = "Centered IQ", y = "Test score")
 
 ```
 
-> If we take into account the low sample size of some of the schools, the scatterplots of centered SES against centered IQ for the 10 schools randomly selected do appear to be quite reasonably linear. In general, it seems that there is a relationship where as centered IQ increases, so too does centered SES. The strength of this relationship seems to varry between the 10 schools displayed here, but its general presence is consistent in these data.
+-----
 
+\newpage
 
-### 2. Regress the students’ test scores on centered SES and centered IQ within schools for the full data set - that is, compute a separate regression for each school. Then plot each set of coefficients (starting with the intercepts) against the schools’ mean SES, mean IQ, and class size. Do the coefficients appear to vary systematically by the schools’ centered SES, centered IQ, and class size)?
+# 2. 
 
 ```{r}
+
 
 library(broom)
 library(gridExtra)
@@ -84,12 +132,11 @@ grid.arrange(iq.1,iq.2,iq.3, ncol = 3)
 
 ```
 
->
+-----
 
+\newpage
 
-### 3. Fit linear mixed-effects models to the data, proceeding as follows:
-
-#### a) Begin with a model of test scores by schools with no fixed effects and only a random intercept. What proportion of the total variation in test scores among students is between schools (i.e., what is the intraclass correlation)?
+# 3. a)
 
 ```{r}
 
@@ -101,14 +148,19 @@ intraclass.correlation <- (4.2743^2/(4.2743^2+7.8909^2))
 intraclass.correlation
 
 ```
+-----
 
-> When we fit a model with test scores as the response, no fixed effects, and only a random intercept for *school*, we see that the proportion of total variation in test scores among students just being due to the school they attend is 0.2269, or 22.69%.
+\newpage
 
-#### b) Obtain a model for regressing test scores by schools with any fixed effects at the student level you consider appropriate and random effects for students’ centered SES and centered IQ (recall that your only grouping variable is school). Test whether each of these random effects is needed, and eliminate from the model those that are not (if any are not). How, if at all, are test scores related to the predictors? Justify your choices/decisions.
+# 3. b) 
+
 
 ```{r}
 
 library(RLRsim)
+library(lattice)
+
+ggplot(school.plot, aes(x = ciq, y = cses)) + geom_point() + facet_wrap(~school, ncol = 3) + labs(title = "Centered IQ vs Centered SES by School", x = "Centered IQ", y = "Centered SES")
 
 m.5 <- lmer(test ~ iq + ses + (cses - 1|school), school)
 
@@ -122,7 +174,7 @@ m.9 <- lmer(test ~ iq + ses + (1 + cses||school), school)
 
 m.10 <- lmer(test ~ iq + ses + (1 + ciq||school), school)
 
-m.11 <- lmer(test ~ iq + ses + (cses - 1 + ciq - 1||school), school)
+m.11 <- lmer(test ~ iq + ses + (cses + ciq - 1||school), school)
 
 
 # testing cses random effect
@@ -133,18 +185,22 @@ exactRLRT(m.5,m.8,m.10)
 
 exactRLRT(m.6,m.8,m.9)
 
-# testing school random effect alone
+# testing school random effect intercept alone
 
 exactRLRT(m.7,m.8,m.11)
 
-sumary(m.6)
+sumary(m.10)
+
+dotplot(ranef(m.10, condVar = TRUE))
 
 ```
 
-> After testing the various random effects introduced into the model, we see that the random effects for students' centered IQ and an intercept, when grouped by school, are significant. Centered SES was found to be non-significant using the exact restricted likelihood ratio test. These tests were done on models containing fixed effects for individual student IQ scores, and socioeconomic status as those two regressors seem to be likely contributing to test scores - but this assumption will be validated later in part d. 
-> From the summary of the model, we see that for the fixed effects: as a student's iq and ses increase by one unit, their test scores increase by 2.30 and 0.17 points, respectively while holding the other regressor constant. The large difference between these two coefficient estimates is likely largely due to the difference in scale between the two variables (4-18.5 for *IQ* and 10-50 for *SES*), and so the real difference in effect between the two is not so large.
+-----
 
-#### c) Introduce school level predictors; i.e., mean school SES, mean school IQ, and class size in your model. Test whether the random effects that you retained in part b model are still required now that there are other predictors in the model. 
+\newpage
+
+# 3. c)
+
 
 ```{r}
 
@@ -154,15 +210,19 @@ m.c2 <- lmer(test ~ iq + ses + class.size + meanses + meaniq + (ciq + 1||school)
 
 m.c3 <- lmer(test ~ iq + ses + class.size + meanses + meaniq + (1|school), school)
 
+# Test for ciq effect
 exactRLRT(m.c,m.c2,m.c3)
 
+# Test for intercept
 exactRLRT(m.c3,m.c2,m.c)
 
 ```
 
-> Both of the random effects retained in the model from part b are both still significant when tested using the exact restricted likelihood ratio test, even after the additional school level predictors are added.
+-----
 
-#### d)  Compute tests of the various main effects and interactions. Then simplify the model by removing any fixed-effects terms that are nonsignificant.
+\newpage
+
+3. d)
 
 ```{r}
 
@@ -178,12 +238,12 @@ KRmodcomp(m.int,m.main)
 m.int2 <- lmer(test ~ iq * ses + class.size + meanses * meaniq + (ciq + 1||school), school, REML = FALSE)
 
 KRmodcomp(m.int,m.int2)
-# Can't reject null hypothesis that reduced model is sufficient.
+# Can't reject null hypothesis that reduced model is sufficient. So remove interaction with class size.
 
 m.int3 <- lmer(test ~ iq * ses + meanses * meaniq + (ciq + 1||school), school, REML = FALSE)
 
 KRmodcomp(m.int2,m.int3)
-# Can't reject null that reduced is sufficient, again.
+# Can't reject null that reduced is sufficient, again. So remove class size.
 
 m.int4 <- lmer(test ~ iq * ses + (ciq + 1||school), school, REML = FALSE)
 
@@ -195,101 +255,41 @@ m.int5 <- lmer(test ~ meaniq * meanses + (ciq + 1||school), school, REML = FALSE
 KRmodcomp(m.int3,m.int5)
 # This null model also rejected, can't remove student level iq and ses yet
 
-```
+m.int6 <- lmer(test ~ iq * ses + meanses + meaniq + (ciq + 1||school), school, REML = FALSE)
 
+KRmodcomp(m.int3,m.int6)
+# Null model rejected, so can't remove interaction between meanses and meaniq.
 
+m.int7 <- lmer(test ~ iq + ses + meanses * meaniq + (ciq + 1||school), school, REML = FALSE)
 
+KRmodcomp(m.int3,m.int7)
+# Null model rejected again, so can't remove interaction between student level iq and ses.
 
+m.int8 <- lmer(test ~ iq * ses * meanses * meaniq + (ciq + 1||school), school, REML = FALSE)
 
+KRmodcomp(m.int8,m.int3)
+# So reject null model, barely at alpha 0.05. Need to keep higher order interaction terms for now.
 
+Anova(m.int8)
+# Suggests that threeway interaction between iq, ses, and meaniq is needed.
 
-\newpage
+m.int9 <- lmer(test ~ iq * ses * meaniq + meanses:meaniq + (ciq + 1||school), school, REML = FALSE)
 
-## Appendix
+KRmodcomp(m.int8,m.int9)
+# Marginal, but can't reject null model. So looks like removal of 4 way interaction, and three ways with meanses is okay.
 
------
+m.int10 <- lmer(test ~ iq * ses * meaniq + meanses:meaniq + class.size + (ciq + 1||school), school, REML = FALSE)
 
-# 1.
+m.int11 <- lmer(test ~ iq * ses * meaniq + meanses:meaniq + meanses + (ciq + 1||school), school, REML = FALSE)
 
-```{r}
+m.int12 <- lmer(test ~ ciq*cses + (ciq + 1||school), school, REML = FALSE)
 
-rm(list=ls())
-library(alr4)
-library(ggplot2)
-library(faraway)
-library(pscl)
-library(GGally)
+KRmodcomp(m.int11,m.int9)
+# Seems to be the best model, basically model 9 with addition of main effect for meanses.
 
-weed <- read.table("takehome.txt")
-
-summary(weed)
-# So, ranges of days and moist are quite large and both include zero. Also, lots of 0 counts of weeds. Probably should consider using a zero inflated poisson model.
-
-ggpairs(weed)
-# Moist looks almost bimodal, the lack of values from 52-77 is clear, but is it important?
-
-weed$moistcat <- ifelse(weed$Moist < "52", "low", "high")
-
-m1 <- glm(Weeds ~ ., data = weed, family = poisson)
-m2 <- glm(Weeds ~ Moist*Days, data = weed, family = poisson)
-m3 <- glm(Weeds ~ Moist, data = weed, family = poisson)
-#m4 <- glm.nb(Weeds ~ Moist*Days, data = weed)
-#m5 <- glm.nb(Weeds ~ Moist, data = weed)
-m6 <- glm(Weeds ~ moistcat, data = weed, family = poisson)
-m7 <- glm(Weeds ~ Moist + I(Moist^2), data = weed, family = poisson)
-
-
-pchisq(deviance(m1),df.residual(m1),lower=FALSE)
-pchisq(deviance(m2),df.residual(m2),lower=FALSE)
-pchisq(deviance(m3),df.residual(m3),lower=FALSE)
-pchisq(deviance(m6),df.residual(m6),lower=FALSE)
-pchisq(deviance(m7),df.residual(m7),lower=FALSE)
-
-pchisq(deviance(m3)-deviance(m1),df.residual(m3)-df.residual(m1),lower=FALSE)
-pchisq(deviance(m1)-deviance(m2),df.residual(m1)-df.residual(m2),lower=FALSE)
-pchisq(deviance(m3)-deviance(m2),df.residual(m3)-df.residual(m2),lower=FALSE)
-pchisq(deviance(m6)-deviance(m3),df.residual(m6)-df.residual(m3),lower=FALSE)
-pchisq(deviance(m3)-deviance(m7),df.residual(m3)-df.residual(m7),lower=FALSE)
-
-# So, none of these models appear to fit particularly well, really low p-values from the goodness of fit tests. But, of the three models, we see that the one with only Moist (m3) seems to be the best, according to these tests. Additionally, we see from the summary command that m3 has the lowest AIC of these models.
-# Also, from the fourth test above we can reject the null hypothesis that the reduced model, with our factor *moistcat*, fits better than the model with the full *Moist* regressor.
-# Also, the addition of the quadratic term for Moist^2 does not seem to significantly improve the model, as seen in the fifth test above versus the reduced model with just *Moist*.
-# So, of all the basic poisson models, we see that the model with *Moist* alone fits the best.
-# Will now try some tests to see why the deviance is still so high in m3.
-
-pcount <- colSums(predprob(m3)[,1:13])
-ocount <- table(weed$Weeds)[1:13]
-plot(pcount,ocount,type="n",xlab="Predicted",ylab="Observed")
-text(pcount,ocount, 0:12)
-abline(0,1)
-# The observed number of zeros (17) is much higher than the expected (~13), so it seems like going with a zero inflated poisson model would be a good choice here. But, the number of 1's seems to be higher than expected as well. Maybe the probability of observing 0 or 1 type of weeds is different than the other amounts and so 1 should be the hurdle?
-
-
-mz1 <- hurdle(formula = Weeds ~ Moist, data = weed)
-mz2 <- hurdle(formula = Weeds ~ Moist + Days, data = weed)
-#mz3 <- zeroinfl(formula = Weeds ~ Moist, data = weed)
-mz4 <- hurdle(formula = Weeds ~ Moist, data = weed, level = 1)
-
-lrt <- 2*(mz2$loglik - mz1$loglik)
-
-1-pchisq(lrt, 2)
-# So, can't reject null hypothesis that the reduced model, mz1, adaquately explains the response.
-
-pcount <- colSums(predprob(mz1)[,1:13])
-plot(pcount,ocount,type="n",xlab="Predicted",ylab="Observed")
-text(pcount,ocount, 0:12)
-abline(0,1)
-# So fitting the hurdle model makes this look much better, but the 1 count still has more observations than predicted.
-
-halfnorm(residuals(mz1))
-# No outliers
-
-plot(log(fitted(mz1)),log((weed$Weeds-fitted(mz1))^2), 
-     xlab=expression(hat(mu)),ylab=expression((y-hat(mu))^2))
-abline(0,1)
-# Mean seems pretty close to the variance here, not perfect, but it's okay.
-
-
+# Now trying using AIC for model selection
+anova(m.main,m.int,m.int2,m.int3,m.int4,m.int5,m.int6,m.int7,m.int8,m.int9,m.int10, m.int11,m.int12)[,1:4]
+# The AIC approach also leads us to select m.int11, as it has the lowest value.
 
 ```
 
@@ -297,73 +297,45 @@ abline(0,1)
 
 \newpage
 
-# 2. 
+3. e) 
 
 ```{r}
 
-summary(mz1)
+library(visreg)
 
-exp(coef(mz1))
+m.final <- lmer(test ~ iq * ses * meaniq + meanses:meaniq + meanses + (ciq + 1||school), school)
+
+diagd <- fortify(m.final)
+ggplot(diagd, aes(sample=.resid))+stat_qq()
+# QQ plot looks great, residuals are normal.
+ggplot(diagd, aes(x=.fitted,y=.resid)) + geom_point(alpha=0.3) + geom_hline(yintercept=0) + xlab("Fitted") + ylab("Residuals")
+# Overall the residual-fit plot looks quite good. See that there is a reduction in the variance at higher fitted score values, which makes sense - people who do well on test generally do well at the same level, becuase there's only so high one can score on a test.
+
+sumary(m.final)
+
+visreg(m.final, "meaniq", by = "meanses", gg = TRUE)
+
+visreg(m.final, "meanses", by = "meaniq", gg = TRUE)
+
+visreg(m.final, "ses", by = "iq", gg = TRUE)
+
+visreg(m.final, "ses", by = "meaniq", gg = TRUE)
+
+visreg(m.final, "iq", by = "ses", gg = TRUE)
+
+visreg(m.final, "meaniq", by = "ses", gg = TRUE)
+
+visreg(m.final, "meaniq", by = "iq", gg = TRUE)
+
+m.ciq <- lmer(test ~ iq * ses * meaniq + meanses:meaniq + meanses + (ciq - 1|school), school)
+
+m.1rand <- lmer(test ~ iq * ses * meaniq + meanses:meaniq + meanses + (1|school), school)
+
+exactRLRT(m.ciq,m.final,m.1rand)
+
+exactRLRT(m.1rand,m.final,m.ciq)
 
 ```
-
------
-
-\newpage
-
-# 3. 
-
-```{r}
-
-newlawn <- data.frame(Moist = 83, Days = 365)
-
-predict(mz1, newdata = newlawn, type = "response")
-
-predict(mz1, newdata = newlawn, type = "prob")
-
-# Also, can look at the probability coming from the "zero"" part of the model
-# 1 - predict(mz1, newdata = newlawn, type = "zero")
-# When the hurdle model is used, type = zero gives the probability of observing a non-zero count, based on the zero hurdle component - so this number is the probability of seeing a non-zero number of types of weeds. So 1- the predict command here is the probability of seeing a zero-number of types from the zero component of the hurdle model alone.
-
-weedtable <- predict(mz1, newdata = newlawn, type = "prob")
-
-sum(weedtable[5:14])
-
-```
-
------
-
-\newpage
-
-# 4. 
-
-```{r}
-
-X = model.matrix(Weeds ~ Days*Moist, weed)
-y = as.numeric(weed$Weeds)
-
-beta_t = rep(0,4)
-mu = exp(X%*%beta_t) 
-beta_t1 = beta_t + solve(t(X)%*%diag(c(mu))%*%X)%*%t(X)%*%(y-mu)
-
-i.count = 1
-while (sum((beta_t1-beta_t)^2) > 1e-6){
-  beta_t = beta_t1
-  mu = exp(X%*%beta_t)
-  beta_t1 = beta_t + solve(t(X)%*%diag(c(mu))%*%X)%*%t(X)%*%(y-mu)
-  i.count = i.count+1
-  print(c(i.count,beta_t1))
-}
-
-beta_t1
-
-m.rep <- glm(Weeds ~ Days*Moist, family = "poisson", data = weed)
-summary(m.rep)$coef[,1]
-
-
-
-````
-
 
 -----
 
